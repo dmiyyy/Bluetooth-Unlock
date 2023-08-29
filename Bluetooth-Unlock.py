@@ -8,6 +8,7 @@ import subprocess
 import time
 import getpass
 import configparser
+from datetime import datetime
 try:
     import bluetooth
     from bluetooth import *
@@ -37,6 +38,8 @@ USER = getpass.getuser() #For the thank you message
 GET_DEVADDR = 1 #For setup when no config is found
 SELECT_ENV = 1 #For setup when no config is found
 VERSION = float(0) #For when the version can't be found
+
+#nonlocal mode
 
 #Checks for a new version
 def check_version():
@@ -76,8 +79,9 @@ def check_update():
     config.clear()
     #Confirmation
     while True:
-        UPDATE = str(input("Would you like to check for an update? [Y/N] "))
-        UPDATE = UPDATE.upper()
+        #UPDATE = str(input("Would you like to check for an update? [Y/N] "))
+        #UPDATE = UPDATE.upper()
+        UPDATE = "N"
         if UPDATE == "Y" or UPDATE == "N":
             break
         else:
@@ -236,8 +240,9 @@ Thanks :)\n""")
 def debug_mode():
     while True:
         global DEBUG
-        DEBUG = input("Would you like to activate debug mode? [Y/N] ")
-        DEBUG = DEBUG.upper()
+        #DEBUG = input("Would you like to activate debug mode? [Y/N] ")
+        #DEBUG = DEBUG.upper()
+        DEBUG =  "Y"
         if DEBUG == "Y":
             print("DEBUG is active")
             break
@@ -272,7 +277,7 @@ def print_debug_info():
         print(config.sections())
         print("Desktop Environment is", ENV)
         print("Device Address is",DEVADDR,"\n")
-        time.sleep(4)
+        time.sleep(1)
     else: time.sleep(1)
 
 def print_contributors():
@@ -282,28 +287,34 @@ def print_contributors():
 #    print("blackPanther OS has improved/optimized the code of this project")
 #    print("jellykells Fixed a bug")
     print("Thanks to all of them :)\n")
-    time.sleep(4)
+    time.sleep(1)
 #Variables for Main code
-CHECKINTERVAL = 3 # device pinged at this interval (seconds) when screen is unlocked min:3
-CHECKREPEAT = 2  # device must be unreachable this many times to lock
+CHECKINTERVAL = 2 # device pinged at this interval (seconds) when screen is unlocked min:3
+CHECKREPEAT = 5  # device must be unreachable this many times to lock
 mode = "unlocked"
 
 #Main code for Bluetooth-Unlock
 #Return code 0 is when the command has ran successfully
 #Return code 1 is when the command has failed to reach the device
+
 def main_bu_code():
+    mode = "unlocked"
     print("Bluetooth-Unlock is now active!")
     while True:
         tries = 0
         while tries < CHECKREPEAT:
             #Checks for the device
-            time.sleep(CHECKINTERVAL)
+            #time.sleep(CHECKINTERVAL)
             check = subprocess.Popen(["l2ping", DEVADDR, "-t", "1", "-c", "1"], shell=False, stdout=subprocess.PIPE)
             check.wait()
             retcode = check.returncode
+            print("Return Code: 1 - OK, 0 - failed")
+            print(retcode)
+            print(mode)         
+            print(datetime.now())
             if retcode == 0 and DEBUG == "Y":
                 print("ping OK!")
-                break
+                #break
             elif retcode > 0 and DEBUG == "Y":
                 #Prints returncode when debug is active
                 print("ping response code: %d" % (retcode))
@@ -312,10 +323,10 @@ def main_bu_code():
 
             if retcode == "Can\'t create socket: Operation not permitted":
                 print("Couldn't create a socket due to permissions")
-
-                #Unlocks when the device IS found
-                if retcode == 0 and mode == "locked":
-                    mode = "unlocked"
+                break
+            #Unlocks when the device IS found
+            if retcode == 0 and mode == "locked":
+                mode = "unlocked"
                 if ENV == "LOGINCTL":
                     os.system("loginctl unlock-session")
                 elif ENV == "KDE":
@@ -329,9 +340,12 @@ def main_bu_code():
                 elif ENV == "CINNAMON":
                     os.system("cinnamon-screensaver-command -d")
 
-                #Locks when the device ISN'T found
-                if retcode > 0 and mode == "unlocked":
-                    mode = "locked"
+            #Locks when the device ISN'T found
+            print ("retcode-mode")
+            print (retcode)
+            #print (mode)
+            if retcode > 0 and mode == "unlocked":
+                mode = "locked"
                 if ENV == "LOGINCTL":
                     os.system("loginctl lock-session")
                 elif ENV == "KDE":
@@ -344,21 +358,20 @@ def main_bu_code():
                     os.system("mate-screensaver-command -l")
                 elif ENV == "CINNAMON":
                     os.system("cinnamon-screensaver-command -l")
-
                 if mode == "locked":
                     time.sleep(1)
                 else:
                     time.sleep(CHECKINTERVAL)
 
-check_version()
-check_update()
+#check_version()
+#check_update()
 load_options()
-available_desktop()
+#available_desktop()
 select_env()
 message()
 debug_mode()
-thank_you()
+#thank_you()
 get_device_address()
 print_debug_info()
-print_contributors()
+#print_contributors()
 main_bu_code()
