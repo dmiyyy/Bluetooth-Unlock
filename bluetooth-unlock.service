@@ -1,0 +1,19 @@
+# systemd user service for Bluetooth-Unlock
+# Install:
+#   mkdir -p ~/.config/systemd/user
+#   sed "s#@DIR@#$PWD#" bluetooth-unlock.service > ~/.config/systemd/user/bluetooth-unlock.service
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now bluetooth-unlock.service
+[Unit]
+Description=Bluetooth-Unlock (lock session when Bluetooth device goes away)
+After=graphical-session.target bluetooth.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/env python3 @DIR@/Bluetooth-Unlock.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target
