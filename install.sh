@@ -1,108 +1,48 @@
 #!/bin/bash
-#Checking for root
-if [[ "$EUID" -ne 0 ]]; then
-  echo "Please run as root, so sudo password isn't required later on..."
-  #exit 1
-fi
+# Installs dependencies for Bluetooth-Unlock and allows l2ping to run without sudo.
+set -u
 
 echo "============================================="
 echo "Bluetooth Unlock Tool For Linux Distributions"
-echo "            Setup Version V.8.1              "
 echo "============================================="
 
-#5 second countdown timer
-secs=$((5))
+SUDO=""
+if [[ "$EUID" -ne 0 ]]; then
+  SUDO="sudo"
+fi
+
+if command -v apt-get >/dev/null 2>&1; then
+  echo "Using apt"
+  $SUDO apt-get update
+  $SUDO apt-get install -y python3 bluez libcap2-bin || exit 1
+elif command -v dnf >/dev/null 2>&1; then
+  echo "Using dnf"
+  $SUDO dnf install -y python3 bluez libcap || exit 1
+elif command -v yum >/dev/null 2>&1; then
+  echo "Using yum"
+  $SUDO yum install -y python3 bluez libcap || exit 1
+elif command -v pacman >/dev/null 2>&1; then
+  echo "Using pacman"
+  $SUDO pacman -S --needed --noconfirm python bluez bluez-utils libcap || exit 1
+elif command -v zypper >/dev/null 2>&1; then
+  echo "Using zypper"
+  $SUDO zypper install -y python3 bluez libcap-progs || exit 1
+elif command -v emerge >/dev/null 2>&1; then
+  echo "Using emerge"
+  $SUDO emerge --noreplace dev-lang/python net-wireless/bluez sys-libs/libcap || exit 1
+else
+  echo "Unsupported package manager, please install: python3, bluez (l2ping, bluetoothctl), libcap (setcap)"
+fi
+
+L2PING="$(command -v l2ping || true)"
+if [[ -z "$L2PING" ]]; then
+  echo "WARNING: l2ping not found. On some distributions it is in a separate package"
+  echo "(e.g. bluez-deprecated / bluez-utils). Alternatively set 'detection = bluetoothctl' in config.ini."
+else
+  # So that there is no need to use sudo in the program
+  $SUDO setcap 'cap_net_raw,cap_net_admin+eip' "$L2PING" && echo "Capabilities set on $L2PING"
+fi
+
 echo ""
-while [[ $secs -gt 0 ]]; do
-   echo -ne " Setup will start in: $secs\033[0K\r"
-   sleep 1
-   : $((secs--))
-done
-
-#Preset Variables to 0
-installfail=0
-bluedepfail=0
-
-#OS Check (Gentoo and Ubuntu/Debian supported)
-if [ -x "$(which gentoo_release 2>/dev/null)" ];then
-release=$(gentoo_release -i)
-else
-release=$(lsb_release -si)
-fi
-
-echo "Distribution: $release"
-
-#Install for Ubuntu
-if [[ -n "$(echo $release | grep -i Ubuntu)" ]]; then
-  echo "Using APT on Ubuntu!"
-  sudo apt update
-  sudo apt install -y python3 python3-pip bluetooth libbluetooth-dev tar || installfail=1
-  sudo -H -u $USER python3 -m pip install pybluez || bluedepfail=1
-  echo "Install complete! please run Bluetooth-Unlock.py"
-
-elif [[ -n "$(echo $release | grep -i Debian)" ]]; then
-  echo "Using APT on Debian!"
-  echo "WARNING: This hasn't been tested on a Debian system, it may not work!"
-  sudo apt-get update
-  sudo apt-get install -y python3 python3-pip bluetooth libbluetooth-dev tar || installfail=1
-  sudo -H -u $USER python3 -m pip install pybluez || bluedepfail=1
-  echo "Install complete! please run Bluetooth-Unlock.py"
-
-#Install for blackPanther
-elif [[ -n "$(echo $release | grep -i blackPanther)" ]]; then
-  echo "Using blackPanther OS package installer"
-  updating repos
-  installing python3 python3-pybluez tar libcap-utils
-  #Does not require other dependencies
-  echo "Recommend for l2ping run as user: setcap 'cap_net_raw,cap_net_admin+eip' /bin/l2ping"
-  echo "Install complete! please run Bluetooth-Unlock.py"
-
-#Install for Fedora
-elif [[ -n "$(echo $release | grep -i Fedora )" ]]; then
-  echo "Using Yum on Fedora!"
-  pkger=`which yum || which dnf`
-  $pkger install python3 python3-pip python3-bluez bluez-libs tar || installfail=1
-  echo "Install complete! please run Bluetooth-Unlock.py"
-  #Does not require other dependencies
-
-#Install for Gentoo
-elif [[ -n "$(echo $release | grep -i Gentoo )" ]]; then
-  echo "Using Yum on Gentoo!"
-  echo "WARNING: This hasn't been tested on a Gentoo system, it may not work!"
-  yum install python3 python3-pip bluetooth libbluetooth-dev tar || installfail=1
-  sudo -H -u $USER python3 -m pip install pybluez || bluedepfail=1
-  echo "Install complete! please run Bluetooth-Unlock.py"
-
-#Install for POP!-OS
-elif [[ -n "$(echo $release | grep -i Pop)" ]]; then
-  echo "Using APT on POP!-OS!"
-  sudo apt update
-  sudo apt install -y python3 python3-pip bluetooth libbluetooth-dev tar || installfail=1
-  sudo -H -u $USER python3 -m pip install pybluez || bluedepfail=1
-  echo "Install complete! please run Bluetooth-Unlock.py"
-
-#Message for Unsupported OS's
-else
-  echo "Unsupported system please install dependencies yourself, sorry for the inconvenience"
-  echo "Dependencies: python3 python3-pip bluetooth libbluetooth-dev tar"
-  echo "PIP Dependencies: pybluez"
-  echo "If you feel this OS should be supported please create a feature request in the issue section"
-fi
-
-#Fail Detect
-if [[ $installfail == "0" ]]; then
-  echo "Install has worked!"
-elif [[ $bluedepfail == "0" ]]; then
-  echo "Pip has worked!"
-  exit 0
-fi
-
-if [[ $installfail == "1" ]]; then
-  echo "Install has failed"
-elif [[ $bluedepfail == "1" ]]; then
-  echo "Pip has failed"
-  exit 1
-fi
-
-# So that there is no need to use sudo in the program...
-sudo setcap cap_net_raw+ep /usr/bin/l2ping
+echo "Install complete! Run: python3 Bluetooth-Unlock.py"
+echo "To start automatically on login see README.md (systemd user service)."
